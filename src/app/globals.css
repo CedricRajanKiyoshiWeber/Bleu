@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-black: #000000;
+  --color-off-white: #E8E8E8;
+  --color-bleu: #0928F1;
+}
+
+* {
+  margin: 0;
+  box-sizing: border-box;
+}
+
+::selection {
+  background: var(--color-bleu);
+  color: var(--color-off-white);
+}
+
+body {
+  background: var(--color-black);
+  color: var(--color-off-white);
+  overflow-x: hidden;
+}
+
+.font-heading {
+  font-family: "parabolica", sans-serif;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.text-trim-cap {
+  text-box-trim: trim-both;
+  text-box-edge: cap alphabetic;
+}
+
+.font-body {
+  font-family: "neue-haas-grotesk-display", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
