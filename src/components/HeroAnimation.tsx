@@ -412,6 +412,9 @@ export default function HeroAnimation() {
           // Offset inner span right so WE will land screen-centered
           if (weRefineInner) tl.set(weRefineInner, { x: halfRefineOffset }, pos)
 
+          // Ensure parent container is visible (stale autoAlpha:0 from previous loop)
+          if (weRefine) tl.set(weRefine, { autoAlpha: 1 }, pos)
+
           // ── Part 1: WE scales down in (like STUDIO pulse) ──
           if (weWord) {
             tl.set(weWord, { autoAlpha: 1, scale: 1.08 }, pos)
