@@ -1,0 +1,89 @@
+"use client"
+
+import { useRef, useCallback } from "react"
+
+// Deterministic pseudo-random so server & client agree (no hydration mismatch)
+function seededRandom(seed: number) {
+  const x = Math.sin(seed + 1) * 10000
+  return x - Math.floor(x)
+}
+
+const BLEU_PATHS = [
+  "M0 63.4667V58.9333H4.54463V54.4H22.7231V49.8667H27.2678V36.2667H22.7231V18.1333H27.2678V13.6H31.8124V9.06667H36.357V4.53333H63.6248V0H72.7141V4.53333H77.2587V9.06667H72.605V4.53333H63.7339V9.06667H68.1694V13.6H72.7141V22.6667H68.1694V27.2H63.7339V31.7333H59.1892V36.2667H72.7141V40.8H77.2587V58.9333H72.7141V63.4667H68.1694V68H49.8818V63.4667H45.4463V49.7579H49.9909V45.3333H54.5355V40.8H59.0802V36.2667H54.5355V31.7333H59.0802V27.2H63.6248V9.06667H54.5355V13.6H50.1V18.1333H45.5554V22.7755H40.9017V36.2667H36.357V54.4H40.9017V63.4667H36.357V68H27.2678V63.4667H18.2876V68H4.54463V63.4667H0ZM31.8124 36.0491H36.357V22.6667H40.9017V18.1333H45.4463V13.6H49.9909V9.06667H40.9017V13.6H36.357V18.1333H31.8124V36.0491ZM49.9909 63.4667H63.6248V58.9333H68.1694V40.8H59.1892V45.3333H63.6248V54.4H59.0802V45.3333H54.6446V49.8667H49.9909V63.4667ZM27.3768 63.4667H31.8124V49.9755H27.2678V54.4H22.8322V58.9333H27.3768V63.4667ZM4.6537 63.4667H18.1785V58.9333H4.6537V63.4667Z",
+  "M77.2587 63.4667V49.8667H81.8033V40.8H86.3479V27.2H90.8926V13.6H95.4372V4.53333H104.526V13.6H99.9818V27.2H95.4372V40.8H90.8926V54.4H86.3479V63.4667H95.4372V58.9333H99.9818V49.8667H104.526V45.3333H109.071V49.9755H104.526V59.0421H99.9818V63.5755H95.4372V68H81.8033V63.4667H77.2587Z",
+  "M118.197 45.3333V49.8667H127.286V45.3333H131.831V36.2667H127.286V40.8H122.741V45.3333H118.197ZM131.903 68H113.652V63.4667H109.107V45.3333H113.652V40.8H118.197V36.2667H122.741V31.7333H136.375V36.2667H140.92V40.8H136.375V45.4421H131.831V49.9755H127.286V54.4H118.197V63.4667H131.794V58.9333H136.375V49.8667H140.811V45.3333H145.464V49.8667H140.92V59.0421H136.375V63.4667H131.903V68Z",
+  "M150.009 63.4667V54.4H154.554V45.3333H159.098V36.2667H150.009V45.3333H145.464V36.2667H149.791V31.7333H163.643V36.2667H168.188V45.3333H163.643V58.9333H159.098V63.4667H168.188V54.4H172.732V45.3333H177.277V31.7333H186.366V45.3333H181.821V58.9333H177.277V63.4667H186.366V58.9333H190.911V49.8667H195.455V45.3333H200V49.9755H195.455V59.0421H190.911V63.5755H186.366V68H172.732V63.5755H168.188V68H154.554V63.4667H150.009Z",
+]
+
+const MOSAIC_COLS = 44
+const MOSAIC_ROWS = 15
+const CELL_W = 200 / MOSAIC_COLS
+const CELL_H = 68 / MOSAIC_ROWS
+
+const MOSAIC_CELLS = Array.from({ length: MOSAIC_ROWS * MOSAIC_COLS }, (_, i) => {
+  const col = i % MOSAIC_COLS
+  const row = Math.floor(i / MOSAIC_COLS)
+  return {
+    x: col * CELL_W,
+    y: row * CELL_H,
+    w: CELL_W,
+    h: CELL_H,
+    // random transition delay per cell so they don't all dim at once
+    delay: seededRandom(i) * 0.6,
+    // random target opacity when hovered
+    hoverOpacity: 0.3 + seededRandom(i + 500) * 0.5,
+  }
+})
+
+export default function BleuLogoMosaic({ className }: { className?: string }) {
+  const rectsRef = useRef<(SVGRectElement | null)[]>([])
+
+  const handleEnter = useCallback(() => {
+    for (const rect of rectsRef.current) {
+      if (rect) rect.style.opacity = rect.dataset.hoverOpacity!
+    }
+  }, [])
+
+  const handleLeave = useCallback(() => {
+    for (const rect of rectsRef.current) {
+      if (rect) rect.style.opacity = "1"
+    }
+  }, [])
+
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 200 68"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="bleu"
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+    >
+      <defs>
+        <clipPath id="bleu-mosaic-clip">
+          {BLEU_PATHS.map((d, i) => (
+            <path key={i} d={d} />
+          ))}
+        </clipPath>
+      </defs>
+      <g clipPath="url(#bleu-mosaic-clip)">
+        {MOSAIC_CELLS.map((cell, i) => (
+          <rect
+            key={i}
+            ref={(el) => { rectsRef.current[i] = el }}
+            x={cell.x}
+            y={cell.y}
+            width={cell.w}
+            height={cell.h}
+            data-hover-opacity={cell.hoverOpacity}
+            style={{
+              opacity: 1,
+              transition: `opacity 0.4s ease ${cell.delay}s`,
+            }}
+          />
+        ))}
+      </g>
+    </svg>
+  )
+}

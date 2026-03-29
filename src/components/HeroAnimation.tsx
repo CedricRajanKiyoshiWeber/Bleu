@@ -18,6 +18,7 @@ type SceneLayout =
   | 'logo-center'
   | 'areas-split'
   | 'marquee-split'
+  | 'cta-center'
 
 type TransitionOut = 'hard-cut' | 'scale-out' | 'slide-left' | 'slide-right'
 type Motion =
@@ -30,6 +31,7 @@ type Motion =
   | 'slide-in-left'
   | 'slot-spin'
   | 'marquee-in'
+  | 'text-cycle'
   | 'none'
 
 interface Scene {
@@ -45,6 +47,9 @@ interface Scene {
   isLogo?: boolean
   isAreas?: boolean
   isMarquee?: boolean
+  isTextCycle?: boolean
+  cycleTexts?: string[]
+  isCta?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -138,8 +143,8 @@ const SCENES: Scene[] = [
   {
     text: ['ART', 'DIRECTION'],
     duration: 0.1,
-    bg: 'black',
-    textColor: 'bleu',
+    bg: 'bleu',
+    textColor: 'black',
     layout: 'stacked-right',
     motions: ['none'],
     transitionOut: 'slide-left',
@@ -156,8 +161,8 @@ const SCENES: Scene[] = [
   {
     text: ['E-COMMERCE', 'STRATEGIE'],
     duration: 0.1,
-    bg: 'black',
-    textColor: 'bleu',
+    bg: 'bleu',
+    textColor: 'black',
     layout: 'stacked-right',
     motions: ['none'],
     transitionOut: 'slide-left',
@@ -184,38 +189,56 @@ const SCENES: Scene[] = [
     isAreas: true,
   },
 
-  // --- Akt 7: Attitude ---
+  // --- Akt 7: Attitude (text-cycle) ---
   {
     text: ['NO TEMPLATES'],
-    duration: 1.0,
+    duration: 3.0,
     bg: 'black',
     textColor: 'bleu',
     layout: 'smaller-center',
-    motions: ['none'],
+    motions: ['text-cycle'],
     transitionOut: 'hard-cut',
+    isTextCycle: true,
+    cycleTexts: ['NO TEMPLATES', 'NO RETAINERS', 'NO BULLSH*T'],
   },
+
+  // --- Akt 8: Closing CTA ---
   {
-    text: ['NO RETAINERS'],
-    duration: 0.5,
-    bg: 'black',
-    textColor: 'bleu',
-    layout: 'smaller-center',
-    motions: ['none'],
-    transitionOut: 'hard-cut',
-  },
-  {
-    text: ['JUST', 'WORK', 'THAT', 'MATTERS'],
-    duration: 1.4,
+    text: ["LET'S WORK"],
+    duration: 3.0,
     bg: 'bleu',
     textColor: 'black',
-    layout: 'stacked-tight',
+    layout: 'cta-center',
     motions: ['stagger-in', 'breathe'],
-    transitionOut: 'scale-out', // loops back to Logo scene at index 0
+    transitionOut: 'scale-out',
+    isCta: true,
   },
 ]
 
 // Logo is the first scene
 const LOGO_SCENE_INDEX = 0
+
+// ---------------------------------------------------------------------------
+// Cursor data per scene (text + link for hover cursor button)
+// ---------------------------------------------------------------------------
+
+const CURSOR_DATA: { text: string; href: string }[] = [
+  { text: 'Explore', href: '/studio' },               // 0: black
+  { text: 'Our Studio', href: '/studio' },             // 1: bleu
+  { text: 'Our Studio', href: '/studio' },             // 2: bleu
+  { text: 'Our Studio', href: '/studio' },             // 3: bleu
+  { text: 'Our Services', href: '/services' },         // 4: black
+  { text: 'Our Services', href: '/services' },         // 5: black
+  { text: 'Our Services', href: '/services' },         // 6: black
+  { text: 'Our Services', href: '/services' },         // 7: bleu
+  { text: 'Our Services', href: '/services' },         // 8: bleu
+  { text: 'Our Services', href: '/services' },         // 9: bleu
+  { text: 'Our Services', href: '/services' },         // 10: bleu
+  { text: 'Our Services', href: '/services' },         // 11: bleu
+  { text: 'Request a Portfolio', href: '/projects' },    // 12: black
+  { text: 'Request a Portfolio', href: '/projects' },    // 13: black
+  { text: 'Say Hello', href: 'mailto:hello@bleu.studio' }, // 14: bleu
+]
 
 // ---------------------------------------------------------------------------
 // Layout class mapping
@@ -228,10 +251,11 @@ const LAYOUT_CLASSES: Record<SceneLayout, string> = {
   'stacked-left': 'flex flex-col items-start justify-center pl-[5vw] text-[11vw] leading-[0.88]',
   'stacked-right': 'flex flex-col items-end justify-center pr-[5vw] text-[11vw] leading-[0.88]',
   'stacked-tight': 'flex flex-col items-center justify-center text-[12vw] leading-[0.95]',
-  'smaller-center': 'flex items-center justify-center text-[5vw] tracking-[0.08em]',
+  'smaller-center': 'relative flex items-center justify-center text-[5vw] tracking-[0.08em]',
   'logo-center': 'flex items-center justify-center',
   'areas-split': 'flex items-center justify-between px-[5vw]',
   'marquee-split': 'relative w-full h-full',
+  'cta-center': 'flex flex-col items-center justify-center gap-[2vw]',
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +299,38 @@ export default function HeroAnimation() {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRefs = useRef<(HTMLDivElement | null)[]>([])
   const textRefs = useRef<(HTMLDivElement | null)[]>([])
+  const cursorRef = useRef<HTMLDivElement>(null)
+  const currentSceneRef = useRef(0)
+  const scrambleRafRef = useRef(0)
+  const prevBgRef = useRef('')
+
+  const rewriteTo = (el: HTMLElement, target: string) => {
+    cancelAnimationFrame(scrambleRafRef.current)
+    const old = (el.textContent ?? '').trim()
+
+    // Backspace letter by letter, then type letter by letter
+    const steps: string[] = []
+    for (let i = old.length - 1; i >= 0; i--) {
+      steps.push(old.slice(0, i))
+    }
+    for (let i = 1; i <= target.length; i++) {
+      steps.push(target.slice(0, i))
+    }
+
+    let step = 0
+    const interval = 30
+    const start = performance.now()
+
+    const tick = (now: number) => {
+      step = Math.min(Math.floor((now - start) / interval), steps.length - 1)
+      el.textContent = steps[step] || '\u00A0'
+      if (step < steps.length - 1) {
+        scrambleRafRef.current = requestAnimationFrame(tick)
+      }
+    }
+
+    scrambleRafRef.current = requestAnimationFrame(tick)
+  }
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -317,6 +373,21 @@ export default function HeroAnimation() {
 
         const nextI = (i + 1) % SCENES.length
         const introDur = handledBySlide.has(i) ? 0 : getIntroDuration(scene)
+
+        // ── CURSOR tracking ─────────────────────────────────────
+        tl.call(() => {
+          currentSceneRef.current = i
+          const cursor = cursorRef.current
+          if (!cursor) return
+          if (scene.bg !== prevBgRef.current) {
+            const newText = CURSOR_DATA[i]?.text ?? ''
+            const txt = cursor.querySelector('.cursor-text') as HTMLElement
+            if (txt && txt.textContent !== newText) {
+              rewriteTo(txt, newText)
+            }
+            prevBgRef.current = scene.bg
+          }
+        }, [], pos)
 
         // ── SCENE IN ──────────────────────────────────────────────
 
@@ -496,6 +567,29 @@ export default function HeroAnimation() {
             )
           }
           pos += 3.0
+        } else if (scene.motions.includes('text-cycle') && scene.cycleTexts) {
+          // Text-cycle: mask-based vertical strip, scroll upward per word
+          tl.set(el, { autoAlpha: 1 }, pos)
+          const strip = textEl.querySelector('.cycle-strip')
+          if (strip) {
+            const count = scene.cycleTexts.length
+            const cycleDuration = scene.duration / count
+
+            // Start at top (first word visible)
+            tl.set(strip, { yPercent: 0 }, pos)
+
+            // For each subsequent word, snap the strip upward
+            for (let ci = 1; ci < count; ci++) {
+              const swapTime = pos + ci * cycleDuration
+              const targetYPercent = -(ci / count) * 100
+
+              tl.to(strip, {
+                yPercent: targetYPercent,
+                duration: 0.12,
+                ease: 'power3.out',
+              }, swapTime)
+            }
+          }
         } else {
           // 'none' or default: instant show
           tl.set(el, { autoAlpha: 1 }, pos)
@@ -656,10 +750,56 @@ export default function HeroAnimation() {
     return () => ctx.revert()
   }, [])
 
+  // ── Custom hover cursor ──────────────────────────────────────
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    const cursor = cursorRef.current
+    if (!container || !cursor) return
+
+    // Only on devices that support hover (skip touch-only)
+    if (!window.matchMedia('(hover: hover)').matches) return
+
+    container.style.cursor = 'pointer'
+    gsap.set(cursor, { xPercent: -50, yPercent: -50, scale: 0.5 })
+
+    const xTo = gsap.quickTo(cursor, 'x', { duration: 0.45, ease: 'power3' })
+    const yTo = gsap.quickTo(cursor, 'y', { duration: 0.45, ease: 'power3' })
+
+    const onMove = (e: MouseEvent) => {
+      xTo(e.clientX)
+      yTo(e.clientY)
+    }
+    const onEnter = () => {
+      gsap.to(cursor, { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(1.4)' })
+    }
+    const onLeave = () => {
+      gsap.to(cursor, { autoAlpha: 0, scale: 0.5, duration: 0.2 })
+    }
+    const onClick = (e: MouseEvent) => {
+      // Don't hijack clicks on existing links (e.g. CTA mailto)
+      if ((e.target as HTMLElement).closest('a')) return
+      const data = CURSOR_DATA[currentSceneRef.current]
+      if (data) window.location.href = data.href
+    }
+
+    container.addEventListener('mousemove', onMove)
+    container.addEventListener('mouseenter', onEnter)
+    container.addEventListener('mouseleave', onLeave)
+    container.addEventListener('click', onClick)
+
+    return () => {
+      container.style.cursor = ''
+      container.removeEventListener('mousemove', onMove)
+      container.removeEventListener('mouseenter', onEnter)
+      container.removeEventListener('mouseleave', onLeave)
+      container.removeEventListener('click', onClick)
+    }
+  }, [])
+
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 h-full w-full overflow-hidden"
+      className="absolute inset-0 h-full w-full overflow-hidden select-none"
       aria-hidden="true"
     >
       {SCENES.map((scene, i) => {
@@ -726,6 +866,20 @@ export default function HeroAnimation() {
                       Our Partners
                     </span>
                   </>
+                ) : scene.isTextCycle ? (
+                  <div className="relative h-[1.2em] overflow-hidden" style={{ maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)' }}>
+                    <div className="cycle-strip flex flex-col items-center">
+                      {scene.cycleTexts?.map((text, ci) => (
+                        <span key={ci} className="block whitespace-nowrap h-[1.2em] flex items-center justify-center">
+                          {text}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : scene.isCta ? (
+                  <a href="mailto:hello@bleu.studio" className="cta-text line block text-[12vw] leading-[0.95] whitespace-nowrap">
+                    {scene.text[0]}
+                  </a>
                 ) : scene.text.length === 1 ? (
                   <span className="line whitespace-nowrap">{scene.text[0]}</span>
                 ) : (
@@ -740,6 +894,29 @@ export default function HeroAnimation() {
           </div>
         )
       })}
+
+      {/* Hover cursor button */}
+      <div
+        ref={cursorRef}
+        className="pointer-events-none fixed top-0 left-0 z-40 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-5 py-2.5 backdrop-blur-xl opacity-0 invisible"
+      >
+        <span className="cursor-text font-body text-sm text-off-white/70 whitespace-nowrap">
+          Explore
+        </span>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-off-white/70"
+        >
+          <path d="M6 2l6 6-6 6" />
+        </svg>
+      </div>
     </div>
   )
 }

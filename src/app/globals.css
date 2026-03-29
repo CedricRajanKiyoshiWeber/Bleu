@@ -4,11 +4,14 @@
   --color-black: #000000;
   --color-off-white: #E8E8E8;
   --color-bleu: #0928F1;
-}
 
-* {
-  margin: 0;
-  box-sizing: border-box;
+  --spacing-page-x: 1.5rem;
+  --spacing-page-x-md: 4rem;
+  --spacing-page-top: 4rem;
+  --spacing-page-top-md: 6rem;
+  --spacing-page-bottom: 12rem;
+  --spacing-title-gap: 4rem;
+  --spacing-section-gap: 2rem;
 }
 
 ::selection {
@@ -20,6 +23,10 @@ body {
   background: var(--color-black);
   color: var(--color-off-white);
   overflow-x: hidden;
+}
+
+h1 {
+  text-transform: uppercase;
 }
 
 .font-heading {
@@ -38,3 +45,4 @@ body {
   font-weight: 400;
   font-style: normal;
 }
+
