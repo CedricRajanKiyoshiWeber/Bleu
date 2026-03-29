@@ -301,19 +301,8 @@ export default function HeroAnimation() {
       const logoTextEl = textRefs.current[LOGO_SCENE_INDEX]
       if (logoEl) gsap.set(logoEl, { autoAlpha: 1 })
 
-      const tl = gsap.timeline({
-        repeat: -1,
-        paused: true,
-        onRepeat: () => {
-          // Reset all scenes cleanly before each loop iteration
-          sceneRefs.current.forEach((sceneEl) => {
-            if (sceneEl) gsap.set(sceneEl, { autoAlpha: 0 })
-          })
-          textRefs.current.forEach((txtEl) => {
-            if (txtEl) gsap.set(txtEl, { clearProps: 'transform,opacity,visibility' })
-          })
-        },
-      })
+      const tl = gsap.timeline({ paused: true })
+
       let pos = 0
       let creativeStartPos = 0
       const handledBySlide = new Set<number>()
@@ -463,9 +452,9 @@ export default function HeroAnimation() {
             tl.set(weRefine, { autoAlpha: 0 }, scaleOutStart + scaleOutDur)
           }
           // Reset inner elements so they're clean for the next loop iteration
-          if (weWord) tl.set(weWord, { clearProps: 'transform,opacity,visibility' }, scaleOutStart + scaleOutDur)
+          if (weWord) tl.set(weWord, { clearProps: 'transform' }, scaleOutStart + scaleOutDur)
           if (weRefineInner) tl.set(weRefineInner, { clearProps: 'transform' }, scaleOutStart + scaleOutDur)
-          if (weRefine) tl.set(weRefine, { clearProps: 'transform,opacity,visibility' }, scaleOutStart + scaleOutDur + 0.01)
+          if (weRefine) tl.set(weRefine, { clearProps: 'transform' }, scaleOutStart + scaleOutDur + 0.01)
 
           // ── Part 2: Marquees burst in after WE REFINE is gone ──
           const marqueeStart = scaleOutStart + scaleOutDur
@@ -622,6 +611,23 @@ export default function HeroAnimation() {
           }
         }
       })
+
+      // Loop: restart timeline at the actual end of visible scenes,
+      // not when the longest child tween finishes (marquee tweens overshoot).
+      tl.call(
+        () => {
+          sceneRefs.current.forEach((sceneEl) => {
+            if (sceneEl) gsap.set(sceneEl, { autoAlpha: 0 })
+          })
+          textRefs.current.forEach((txtEl) => {
+            if (txtEl) gsap.set(txtEl, { clearProps: 'transform,opacity,visibility' })
+          })
+          tl.invalidate()
+          tl.restart()
+        },
+        [],
+        pos,
+      )
 
       // After 1s static logo hold, scale-out then start timeline from CREATIVE
       gsap.delayedCall(1, () => {
